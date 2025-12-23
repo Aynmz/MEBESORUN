@@ -1,0 +1,371 @@
+diff --git a/LocalLlmClient.cs b/LocalLlmClient.cs
+index e69de29..0000000 100644
+--- a/LocalLlmClient.cs
++++ b/LocalLlmClient.cs
+@@ -1,200 +1,200 @@
++using System;
++using System.Net.Http;
++using System.Text;
++using System.Threading;
++using System.Threading.Tasks;
++using Newtonsoft.Json;
++using Newtonsoft.Json.Linq;
++
++namespace MEBESORUN
++{
++    public class LocalLlmClient : IDisposable
++    {
++        private readonly HttpClient _httpClient;
++        private readonly string _apiKey;
++        private readonly string _baseUrl;
++        private readonly string _model;
++        private bool _disposed;
++
++        public LocalLlmClient()
++        {
++            // Güvenlik: Anahtar asla kaynak kodda saklanmamalı.
++            // Beklenen kullanım: OPENAI_API_KEY ortam değişkeni veya bir secret manager.
++            _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")?.Trim() ?? "";
++
++            if (string.IsNullOrEmpty(_apiKey))
++            {
++                // Geliştirme esnasında daha yumuşak davranmak isterseniz burayı değiştirin (ör. log ve fallback).
++                throw new InvalidOperationException("OPENAI_API_KEY ortam değişkeni bulunamadı. Lütfen API anahtarını ortam değişkeni olarak ayarlayın.");
++            }
++
++            // Base URL ve model de ortam değişkenleriyle yapılandırılabilir.
++            _baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL")?.Trim() ?? "https://api.openai.com/v1/chat/completions";
++            _model = Environment.GetEnvironmentVariable("OPENAI_MODEL")?.Trim() ?? "gpt-3.5-turbo";
++
++            _httpClient = new HttpClient
++            {
++                Timeout = TimeSpan.FromSeconds(60)
++            };
++            _httpClient.DefaultRequestHeaders.Clear();
++            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
++            _httpClient.DefaultRequestHeaders.Add("User-Agent", "MEBESORUN/1.0");
++        }
++
++        // CancellationToken ekledim; çağıran fonksiyon isterse iptal edebilir.
++        public async Task<string> GenerateAnswerAsync(string prompt, int maxTokens = 400, CancellationToken cancellationToken = default)
++        {
++            if (string.IsNullOrWhiteSpace(prompt)) return "[HATA] Prompt boş olamaz.";
++
++            var requestBody = new
++            {
++                model = _model,
++                messages = new[]
++                {
++                    new {
++                        role = "system",
++                        content = "Sen yasalara ve mevzuata hakim bir uzmansın. Cevabında kaynak dosya adını ve sayfa numarasını belirt. Sadece verilen kaynaklardaki bilgilere dayanarak cevap ver."
++                    },
++                    new {
++                        role = "user",
++                        content = prompt
++                    }
++                },
++                max_tokens = maxTokens,
++                temperature = 0.1
++            };
++
++            var jsonContent = JsonConvert.SerializeObject(requestBody);
++            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
++
++            try
++            {
++                using var response = await _httpClient.PostAsync(_baseUrl, content, cancellationToken).ConfigureAwait(false);
++
++                var responseString = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
++
++                if (!response.IsSuccessStatusCode)
++                {
++                    // API hatasını ham olarak döndür, gerekli yerlerde loglanmalı
++                    return $"[API HATA KODU] {(int)response.StatusCode} {response.ReasonPhrase}. Detay: {responseString}";
++                }
++
++                // Güvenli parse
++                var j = JObject.Parse(responseString);
++                var answer = j["choices"]?.First?["message"]?["content"]?.ToString();
++
++                if (string.IsNullOrWhiteSpace(answer))
++                {
++                    return "[API HATASI] Modelden geçerli bir cevap alınamadı.";
++                }
++
++                return answer.Trim();
++            }
++            catch (TaskCanceledException tce) when (!cancellationToken.IsCancellationRequested)
++            {
++                return $"[ZAMAN AŞIMI] İstek zaman aşımına uğradı: {tce.Message}";
++            }
++            catch (OperationCanceledException)
++            {
++                return "[İPTAL] İstek iptal edildi.";
++            }
++            catch (Exception ex)
++            {
++                // Daha ayrıntılı logging için buraya log ekle
++                return $"[BAĞLANTI HATASI] {ex.Message}. İnternet bağlantınızı veya API yapılandırmanızı kontrol edin.";
++            }
++        }
++
++        public void Dispose()
++        {
++            if (_disposed) return;
++            _httpClient?.Dispose();
++            _disposed = true;
++        }
++    }
++}
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,25 @@
++# Visual Studio
++.vs/
++bin/
++obj/
++*.user
++*.suo
++*.userprefs
++
++# Index ve data
++Index/
++Data/
++llm_bin/
++*.log
++
++# Secrets and env
++.env
++.env.local
++*.secret
++
++# NuGet
++packages/
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,86 @@
++```markdown
++# MEBESORUN — Mevzuat Destekli Soru-Cevap Konsol Uygulaması
++
++Bu proje Milli Eğitim Bakanlığı mevzuatına dayalı soru-cevap (mevzuat robotu) prototipidir. 
++Projede PDF'lerden Lucene ile indeksleme yapılıyor, en alakalı sayfa özetleri alınarak LLM'e prompt oluşturuluyor ve cevap üretiliyor.
++
++Önemli Güvenlik Notu
++- Hiçbir zaman API anahtarlarını kaynak koduna gömmeyin. Eğer daha önce gömdüyseniz, anahtarı derhal iptal edin (rotate) ve repo geçmişinden silin.
++
++Gereksinimler
++- .NET 8 SDK
++- NuGet paketleri: Lucene.Net 4.8.0, PdfPig, Newtonsoft.Json (csproj içinde referanslı)
++- (Opsiyonel) OpenAI API erişimi veya yerel LLM endpoint
++
++Kurulum & Çalıştırma (yerel geliştirme)
++1. Repo klonlama:
++   git clone git@github.com:Aynmz/MEBESORUN.git
++   cd MEBESORUN
++
++2. Eski gömülü anahtar varsa: derhal iptal edin (OpenAI panelinden) ve geçmiş temizliği uygulayın (git-filter-repo veya BFG). README'nın güvenlik bölümündeki adımları takip edin.
++
++3. Ortam değişkenini ayarlama:
++   - Windows (PowerShell): 
++     setx OPENAI_API_KEY "sk-..."
++     (PowerShell'e yeniden oturum açın)
++   - Linux/macOS (bash):
++     export OPENAI_API_KEY="sk-..."
++
++   Eğer GitHub Actions kullanacaksanız repository secret olarak `OPENAI_API_KEY` ekleyin.
++
++4. PDF dosyalarını `Data/` klasörüne koyun (ör: yönetmelikler.pdf).
++   Proje, exe ile aynı dizinde `Data` klasörünü arar.
++
++5. Derleme:
++   dotnet build
++
++6. Çalıştırma:
++   dotnet run --project MEBESORUN_PROJE.csproj
++   Program açıldıktan sonra:
++   - `yenidizinle` komutu ile PDF'leri yeniden dizinleyin
++   - Soru girin; sonuçlarda LLM'den cevap alınır.
++
++Geçmişten Anahtar Temizleme (kısa)
++- git-filter-repo veya BFG kullanın. (Dikkat: repo tarihçesi yeniden yazılır; ekip üyelerini bilgilendirin.)
++
++Yerel LLM Kullanmak İsterseniz
++- Ollama, GPT4All veya llama.cpp gibi çözümlerle local endpoint kullanılabilir.
++- Eğer local endpoint OpenAI-uyumlu bir HTTP API sunuyorsa (örn. `http://localhost:11434/v1/chat/completions`) `OPENAI_BASE_URL` ortam değişkeni ile LocalLlmClient yapılandırılabilir.
++
++CI (opsiyonel)
++- Basit bir GitHub Actions workflow ile derleme/test ekleyebilirsiniz (örnek `/.github/workflows/ci.yml`).
++
++Yardım / İlerleme
++- İsterseniz ben:
++  1. Repo için commit dizisini hazırlayıp README/.gitignore/LocalLlmClient değişikliklerini içeren commit mesajı örneği veririm.
++  2. Geçmiş temizliği için çalıştırılabilir script (git-filter-repo örneği) oluştururum.
++  3. Lokal LLM entegrasyonu için örnek LocalLlmClient (local endpoint veya subprocess) hazırlarım.
++```
+diff --git a/run.sh b/run.sh
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/run.sh
+@@ -0,0 +1,12 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++# OPENAI_API_KEY ortam değişkeninin varlığını kontrol et
++if [ -z "${OPENAI_API_KEY-}" ]; then
++  echo "ERROR: OPENAI_API_KEY ortam değişkeni set edilmemiş."
++  exit 1
++fi
++
++dotnet build
++dotnet run --project MEBESORUN_PROJE.csproj
+diff --git a/run.ps1 b/run.ps1
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/run.ps1
+@@ -0,0 +1,8 @@
++if (-not $Env:OPENAI_API_KEY) {
++    Write-Error "OPENAI_API_KEY ortam değişkeni set edilmemiş."
++    exit 1
++}
++
++dotnet build
++dotnet run --project MEBESORUN_PROJE.csproj
+diff --git a/LocalLlmClient_LocalEndpoint.cs b/LocalLlmClient_LocalEndpoint.cs
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/LocalLlmClient_LocalEndpoint.cs
+@@ -0,0 +1,69 @@
++using System;
++using System.Net.Http;
++using System.Text;
++using System.Threading;
++using System.Threading.Tasks;
++using Newtonsoft.Json.Linq;
++
++namespace MEBESORUN
++{
++    // Bu sınıf OpenAI benzeri lokal endpoint'lere (ör: http://localhost:11434/v1/chat/completions) kolayca bağlanmak için örnektir.
++    public class LocalLlmClient_LocalEndpoint : IDisposable
++    {
++        private readonly HttpClient _httpClient;
++        private readonly string _baseUrl;
++        private readonly string _model;
++
++        public LocalLlmClient_LocalEndpoint()
++        {
++            _baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL")?.Trim() ?? "http://localhost:11434/v1/chat/completions";
++            _model = Environment.GetEnvironmentVariable("OPENAI_MODEL")?.Trim() ?? "gpt-3.5-turbo";
++
++            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
++            // Eğer endpoint auth gerektiriyorsa ilgili header'ları ekleyin.
++        }
++
++        public async Task<string> GenerateAnswerAsync(string prompt, int maxTokens = 400, CancellationToken cancellationToken = default)
++        {
++            var requestBody = new
++            {
++                model = _model,
++                messages = new[] {
++                    new { role = "system", content = "Sen yasalara ve mevzuata hakim bir uzmansın. Cevabında kaynak dosya adını ve sayfa numarasını belirt. Sadece verilen kaynaklardaki bilgilere dayanarak cevap ver." },
++                    new { role = "user", content = prompt }
++                },
++                max_tokens = maxTokens,
++                temperature = 0.1
++            };
++
++            var json = Newtonsoft.Json.JsonConvert.SerializeObject(requestBody);
++            using var content = new StringContent(json, Encoding.UTF8, "application/json");
++
++            using var resp = await _httpClient.PostAsync(_baseUrl, content, cancellationToken);
++            var respString = await resp.Content.ReadAsStringAsync(cancellationToken);
++
++            if (!resp.IsSuccessStatusCode)
++            {
++                return $"[LOCAL API HATA] {resp.StatusCode}: {respString}";
++            }
++
++            var j = JObject.Parse(respString);
++            return j["choices"]?.First?["message"]?["content"]?.ToString() ?? "[HATA] Cevap alınamadı.";
++        }
++
++        public void Dispose() => _httpClient.Dispose();
++    }
++}
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,19 @@
++name: CI
++
++on:
++  push:
++    branches: [ main ]
++  pull_request:
++    branches: [ main ]
++
++jobs:
++  build:
++    runs-on: ubuntu-latest
++
++    steps:
++    - uses: actions/checkout@v4
++    - name: Setup .NET
++      uses: actions/setup-dotnet@v3
++      with:
++        dotnet-version: 8.0.x
++    - name: Restore & Build
++      run: dotnet build --no-restore
+diff --git a/replacements.txt b/replacements.txt
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/replacements.txt
+@@ -0,0 +1,2 @@
++# regex:sk-... desenine uyan değerleri [REDACTED_OPENAI_KEY] ile değiştir
++regex:sk-[A-Za-z0-9\._\-]+==> [REDACTED_OPENAI_KEY]
+diff --git a/history_cleanup.sh b/history_cleanup.sh
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/history_cleanup.sh
+@@ -0,0 +1,25 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++if [ -z "${REPO_SSH-}" ]; then
++  echo "KULLANIM: REPO_SSH=git@github.com:Aynmz/MEBESORUN.git ./history_cleanup.sh"
++  exit 1
++fi
++
++# Mirror klon
++git clone --mirror "$REPO_SSH" repo-mirror
++cd repo-mirror
++
++# replacements.txt'in üst dizinde olduğundan emin olun
++if [ ! -f ../replacements.txt ]; then
++  echo "replacements.txt bulunamadı. Lütfen replacements.txt dosyasını bir üst dizine koyun."
++  exit 1
++fi
++
++# git-filter-repo çalıştırma (filter-repo kurulu olmalı)
++git filter-repo --replace-text ../replacements.txt
++
++# Temizlik ve push
++git reflog expire --expire=now --all
++git gc --prune=now --aggressive
++git push --force --all
++git push --force --tags
++
++echo "Geçmiş temizleme tamamlandı. Tüm iş arkadaşlarınızı bilgilendirin: repoyu yeniden klonlasınlar."
